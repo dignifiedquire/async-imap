@@ -2470,4 +2470,24 @@ mod tests {
             assert_eq!(metadata[1].value, None);
         }
     }
+
+    #[cfg_attr(feature = "runtime-tokio", tokio::test)]
+    #[cfg_attr(feature = "runtime-async-std", async_std::test)]
+    async fn test_parsing_error() {
+        // Simulate someone connecting to SMTP server with IMAP client.
+        let response = b"220 mail.example.org ESMTP Postcow\r\n".to_vec();
+        let command = "A0001 NOOP\r\n";
+        let mock_stream = MockStream::new(response);
+        let mut session = mock_session!(mock_stream);
+        assert!(session
+            .noop()
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("220 mail.example.org ESMTP Postcow"));
+        assert!(
+            session.stream.inner.written_buf == command.as_bytes().to_vec(),
+            "Invalid NOOP command"
+        );
+    }
 }

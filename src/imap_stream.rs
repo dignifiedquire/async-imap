@@ -105,7 +105,11 @@ impl<R: Read + Write + Unpin> ImapStream<R> {
                     self.decode_needs = 0;
                     Err(Some(io::Error::new(
                         io::ErrorKind::Other,
-                        format!("{:?} during parsing of {:?}", other, buf),
+                        format!(
+                            "{:?} during parsing of {:?}",
+                            other,
+                            String::from_utf8_lossy(buf)
+                        ),
                     )))
                 }
             }
