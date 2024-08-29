@@ -1114,15 +1114,21 @@ impl<T: Read + Write + Unpin + fmt::Debug + Send> Session<T> {
     /// Specifically, the server will generally notify the client immediately via an untagged
     /// `EXISTS` response.  If the server does not do so, the client MAY issue a `NOOP` command (or
     /// failing that, a `CHECK` command) after one or more `APPEND` commands.
-    pub async fn append<S: AsRef<str>, B: AsRef<[u8]>>(
+    pub async fn append(
         &mut self,
-        mailbox: S,
-        content: B,
+        mailbox: impl AsRef<str>,
+        flags: Option<&str>,
+        internaldate: Option<&str>,
+        content: impl AsRef<[u8]>,
     ) -> Result<()> {
         let content = content.as_ref();
         self.run_command(&format!(
-            "APPEND \"{}\" {{{}}}",
+            "APPEND \"{}\"{}{}{}{} {{{}}}",
             mailbox.as_ref(),
+            if flags.is_some() { " " } else { "" },
+            flags.unwrap_or(""),
+            if internaldate.is_some() { " " } else { "" },
+            internaldate.unwrap_or(""),
             content.len()
         ))
         .await?;
