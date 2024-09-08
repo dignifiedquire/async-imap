@@ -1122,16 +1122,17 @@ impl<T: Read + Write + Unpin + fmt::Debug + Send> Session<T> {
         content: impl AsRef<[u8]>,
     ) -> Result<()> {
         let content = content.as_ref();
-        self.run_command(&format!(
-            "APPEND \"{}\"{}{}{}{} {{{}}}",
-            mailbox.as_ref(),
-            if flags.is_some() { " " } else { "" },
-            flags.unwrap_or(""),
-            if internaldate.is_some() { " " } else { "" },
-            internaldate.unwrap_or(""),
-            content.len()
-        ))
-        .await?;
+        let id = self
+            .run_command(&format!(
+                "APPEND \"{}\"{}{}{}{} {{{}}}",
+                mailbox.as_ref(),
+                if flags.is_some() { " " } else { "" },
+                flags.unwrap_or(""),
+                if internaldate.is_some() { " " } else { "" },
+                internaldate.unwrap_or(""),
+                content.len()
+            ))
+            .await?;
 
         match self.read_response().await {
             Some(Ok(res)) => {
@@ -1139,7 +1140,9 @@ impl<T: Read + Write + Unpin + fmt::Debug + Send> Session<T> {
                     self.stream.as_mut().write_all(content).await?;
                     self.stream.as_mut().write_all(b"\r\n").await?;
                     self.stream.flush().await?;
-                    self.read_response().await.transpose()?;
+                    self.conn
+                        .check_done_ok(&id, Some(self.unsolicited_responses_tx.clone()))
+                        .await?;
                     Ok(())
                 } else {
                     Err(Error::Append)
@@ -2349,6 +2352,67 @@ mod tests {
             );
             assert_eq!(status.uid_next, Some(44292));
             assert_eq!(status.exists, 231);
+        }
+    }
+
+    #[cfg_attr(feature = "runtime-tokio", tokio::test)]
+    #[cfg_attr(feature = "runtime-async-std", async_std::test)]
+    async fn append() {
+        {
+            // APPEND command when INBOX is *not* selected.
+            //
+            // Only APPENDUID response is returned.
+            let response = b"+ OK\r\nA0001 OK [APPENDUID 1725735035 2] Append completed (0.052 + 12.097 + 0.049 secs).\r\n".to_vec();
+
+            let mock_stream = MockStream::new(response);
+            let mut session = mock_session!(mock_stream);
+            session
+                .append("INBOX", Some(r"(\Seen)"), None, "foobarbaz")
+                .await
+                .unwrap();
+            assert_eq!(
+                session.stream.inner.written_buf,
+                b"A0001 APPEND \"INBOX\" (\\Seen) {9}\r\nfoobarbaz\r\n".to_vec()
+            );
+        }
+
+        {
+            // APPEND command when INBOX is selected.
+            //
+            // EXISTS response is returned before APPENDUID response is returned.
+            let response = b"+ OK\r\n* 3 EXISTS\r\n* 2 RECENT\r\nA0001 OK [APPENDUID 1725735035 2] Append completed (0.052 + 12.097 + 0.049 secs).\r\n".to_vec();
+
+            let mock_stream = MockStream::new(response);
+            let mut session = mock_session!(mock_stream);
+            session
+                .append("INBOX", Some(r"(\Seen)"), None, "foobarbaz")
+                .await
+                .unwrap();
+            assert_eq!(
+                session.stream.inner.written_buf,
+                b"A0001 APPEND \"INBOX\" (\\Seen) {9}\r\nfoobarbaz\r\n".to_vec()
+            );
+            let exists_response = session.unsolicited_responses.recv().await.unwrap();
+            assert_eq!(exists_response, UnsolicitedResponse::Exists(3));
+            let recent_response = session.unsolicited_responses.recv().await.unwrap();
+            assert_eq!(recent_response, UnsolicitedResponse::Recent(2));
+        }
+
+        {
+            // APPEND to nonexisting folder fails.
+            let response =
+                b"A0001 NO [TRYCREATE] Mailbox doesn't exist: foobar (0.001 + 0.000 secs)."
+                    .to_vec();
+            let mock_stream = MockStream::new(response);
+            let mut session = mock_session!(mock_stream);
+            session
+                .append("foobar", None, None, "foobarbaz")
+                .await
+                .unwrap_err();
+            assert_eq!(
+                session.stream.inner.written_buf,
+                b"A0001 APPEND \"foobar\" {9}\r\n".to_vec()
+            );
         }
     }
 
