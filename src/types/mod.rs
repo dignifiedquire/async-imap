@@ -105,6 +105,8 @@ pub type Uid = u32;
 /// messages which have greater UIDs.
 pub type Seq = u32;
 
+/// Message flags.
+///
 /// With the exception of [`Flag::Custom`], these flags are system flags that are pre-defined in
 /// [RFC 3501 section 2.3.2](https://tools.ietf.org/html/rfc3501#section-2.3.2). All system flags
 /// begin with `\` in the IMAP protocol.  Certain system flags (`\Deleted` and `\Seen`) have
@@ -217,6 +219,7 @@ mod quota;
 pub use self::quota::*;
 
 /// Responses that the server sends that are not related to the current command.
+///
 /// [RFC 3501](https://tools.ietf.org/html/rfc3501#section-7) states that clients need to be able
 /// to accept any response at any time. These are the ones we've encountered in the wild.
 ///

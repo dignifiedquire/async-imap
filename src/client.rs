@@ -59,7 +59,9 @@ impl<T: Read + Write + Unpin + fmt::Debug> AsMut<T> for Session<T> {
     }
 }
 
-/// An (unauthenticated) handle to talk to an IMAP server. This is what you get when first
+/// An (unauthenticated) handle to talk to an IMAP server.
+///
+/// This is what you get when first
 /// connecting. A succesfull call to [`Client::login`] or [`Client::authenticate`] will return a
 /// [`Session`] instance that provides the usual IMAP methods.
 // Both `Client` and `Session` deref to [`Connection`](struct.Connection.html), the underlying
