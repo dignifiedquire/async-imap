@@ -31,6 +31,12 @@ jobs:
     - name: check tokio
       run: cargo check --workspace --all-targets --no-default-features --features runtime-tokio
 
+    - name: check compress feature with tokio
+      run: cargo check --workspace --all-targets --no-default-features --features runtime-tokio,compress
+
+    - name: check compress feature with async-std
+      run: cargo check --workspace --all-targets --no-default-features --features runtime-async-std,compress
+
     - name: check async-std examples
       working-directory: examples
       run: cargo check --workspace --all-targets --no-default-features --features runtime-async-std

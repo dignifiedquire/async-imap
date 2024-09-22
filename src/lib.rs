@@ -95,6 +95,9 @@ mod imap_stream;
 mod parse;
 pub mod types;
 
+#[cfg(feature = "compress")]
+pub use crate::extensions::compress::DeflateStream;
+
 pub use crate::authenticator::Authenticator;
 pub use crate::client::*;
 
