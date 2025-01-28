@@ -30,7 +30,7 @@ pub(crate) async fn parse_get_quota<T: Stream<Item = io::Result<ResponseData>> +
         match resp.parsed() {
             Response::Quota(q) => quota = Some(q.clone().into()),
             _ => {
-                handle_unilateral(resp, unsolicited.clone()).await;
+                handle_unilateral(resp, unsolicited.clone());
             }
         }
     }
@@ -65,7 +65,7 @@ pub(crate) async fn parse_get_quota_root<T: Stream<Item = io::Result<ResponseDat
                 quotas.push(q.clone().into());
             }
             _ => {
-                handle_unilateral(resp, unsolicited.clone()).await;
+                handle_unilateral(resp, unsolicited.clone());
             }
         }
     }

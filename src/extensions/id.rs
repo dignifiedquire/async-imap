@@ -56,7 +56,7 @@ pub(crate) async fn parse_id<T: Stream<Item = io::Result<ResponseData>> + Unpin>
                 })
             }
             _ => {
-                handle_unilateral(resp, unsolicited.clone()).await;
+                handle_unilateral(resp, unsolicited.clone());
             }
         }
     }

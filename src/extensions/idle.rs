@@ -168,7 +168,7 @@ impl<T: Read + Write + Unpin + fmt::Debug + Send> Handle<T> {
                         // continuation, wait for it
                     }
                     Response::Done { .. } => {
-                        handle_unilateral(resp, sender.clone()).await;
+                        handle_unilateral(resp, sender.clone());
                     }
                     _ => return Ok(IdleResponse::NewData(resp)),
                 }
@@ -203,10 +203,10 @@ impl<T: Read + Write + Unpin + fmt::Debug + Send> Handle<T> {
                             .into());
                         }
                     }
-                    handle_unilateral(res, self.session.unsolicited_responses_tx.clone()).await;
+                    handle_unilateral(res, self.session.unsolicited_responses_tx.clone());
                 }
                 _ => {
-                    handle_unilateral(res, self.session.unsolicited_responses_tx.clone()).await;
+                    handle_unilateral(res, self.session.unsolicited_responses_tx.clone());
                 }
             }
         }

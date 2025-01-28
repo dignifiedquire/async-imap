@@ -29,7 +29,7 @@ pub(crate) fn parse_names<T: Stream<Item = io::Result<ResponseData>> + Unpin + S
                             Some(Ok(name))
                         }
                         _ => {
-                            handle_unilateral(resp, unsolicited).await;
+                            handle_unilateral(resp, unsolicited);
                             None
                         }
                     },
@@ -79,7 +79,7 @@ pub(crate) fn parse_fetches<T: Stream<Item = io::Result<ResponseData>> + Unpin +
                     Ok(resp) => match resp.parsed() {
                         Response::Fetch(..) => Some(Ok(Fetch::new(resp))),
                         _ => {
-                            handle_unilateral(resp, unsolicited).await;
+                            handle_unilateral(resp, unsolicited);
                             None
                         }
                     },
@@ -157,7 +157,7 @@ pub(crate) async fn parse_status<T: Stream<Item = io::Result<ResponseData>> + Un
                 }
             }
             _ => {
-                handle_unilateral(resp, unsolicited.clone()).await;
+                handle_unilateral(resp, unsolicited.clone());
             }
         }
     }
@@ -182,7 +182,7 @@ pub(crate) fn parse_expunge<T: Stream<Item = io::Result<ResponseData>> + Unpin +
                     Ok(resp) => match resp.parsed() {
                         Response::Expunge(id) => Some(Ok(*id)),
                         _ => {
-                            handle_unilateral(resp, unsolicited).await;
+                            handle_unilateral(resp, unsolicited);
                             None
                         }
                     },
@@ -213,7 +213,7 @@ pub(crate) async fn parse_capabilities<T: Stream<Item = io::Result<ResponseData>
                 }
             }
             _ => {
-                handle_unilateral(resp, unsolicited.clone()).await;
+                handle_unilateral(resp, unsolicited.clone());
             }
         }
     }
@@ -232,7 +232,7 @@ pub(crate) async fn parse_noop<T: Stream<Item = io::Result<ResponseData>> + Unpi
         .await
     {
         let resp = resp?;
-        handle_unilateral(resp, unsolicited.clone()).await;
+        handle_unilateral(resp, unsolicited.clone());
     }
 
     Ok(())
@@ -338,7 +338,7 @@ pub(crate) async fn parse_mailbox<T: Stream<Item = io::Result<ResponseData>> + U
                 }
             }
             Response::MailboxData(m) => match m {
-                MailboxDatum::Status { .. } => handle_unilateral(resp, unsolicited.clone()).await,
+                MailboxDatum::Status { .. } => handle_unilateral(resp, unsolicited.clone()),
                 MailboxDatum::Exists(e) => {
                     mailbox.exists = *e;
                 }
@@ -358,7 +358,7 @@ pub(crate) async fn parse_mailbox<T: Stream<Item = io::Result<ResponseData>> + U
                 _ => {}
             },
             _ => {
-                handle_unilateral(resp, unsolicited.clone()).await;
+                handle_unilateral(resp, unsolicited.clone());
             }
         }
     }
@@ -386,7 +386,7 @@ pub(crate) async fn parse_ids<T: Stream<Item = io::Result<ResponseData>> + Unpin
                 }
             }
             _ => {
-                handle_unilateral(resp, unsolicited.clone()).await;
+                handle_unilateral(resp, unsolicited.clone());
             }
         }
     }
@@ -421,57 +421,44 @@ pub(crate) async fn parse_metadata<T: Stream<Item = io::Result<ResponseData>> + 
             // [Unsolicited METADATA Response without Values](https://datatracker.ietf.org/doc/html/rfc5464.html#section-4.4.2),
             // they go to unsolicited channel with other unsolicited responses.
             _ => {
-                handle_unilateral(resp, unsolicited.clone()).await;
+                handle_unilateral(resp, unsolicited.clone());
             }
         }
     }
     Ok(res_values)
 }
 
-// check if this is simply a unilateral server response
-// (see Section 7 of RFC 3501):
-pub(crate) async fn handle_unilateral(
+/// Sends unilateral server response
+/// (see Section 7 of RFC 3501)
+/// into the channel.
+///
+/// If the channel is full or closed,
+/// i.e. the responses are not being consumed,
+/// ignores new responses.
+pub(crate) fn handle_unilateral(
     res: ResponseData,
     unsolicited: channel::Sender<UnsolicitedResponse>,
 ) {
-    // ignore these if they are not being consumed
-    if unsolicited.is_full() {
-        return;
-    }
-
     match res.parsed() {
         Response::MailboxData(MailboxDatum::Status { mailbox, status }) => {
             unsolicited
-                .send(UnsolicitedResponse::Status {
+                .try_send(UnsolicitedResponse::Status {
                     mailbox: (mailbox.as_ref()).into(),
                     attributes: status.to_vec(),
                 })
-                .await
-                .expect("Channel closed unexpectedly");
+                .ok();
         }
         Response::MailboxData(MailboxDatum::Recent(n)) => {
-            unsolicited
-                .send(UnsolicitedResponse::Recent(*n))
-                .await
-                .expect("Channel closed unexpectedly");
+            unsolicited.try_send(UnsolicitedResponse::Recent(*n)).ok();
         }
         Response::MailboxData(MailboxDatum::Exists(n)) => {
-            unsolicited
-                .send(UnsolicitedResponse::Exists(*n))
-                .await
-                .expect("Channel closed unexpectedly");
+            unsolicited.try_send(UnsolicitedResponse::Exists(*n)).ok();
         }
         Response::Expunge(n) => {
-            unsolicited
-                .send(UnsolicitedResponse::Expunge(*n))
-                .await
-                .expect("Channel closed unexpectedly");
+            unsolicited.try_send(UnsolicitedResponse::Expunge(*n)).ok();
         }
         _ => {
-            unsolicited
-                .send(UnsolicitedResponse::Other(res))
-                .await
-                .expect("Channel closed unexpectedly");
+            unsolicited.try_send(UnsolicitedResponse::Other(res)).ok();
         }
     }
 }
