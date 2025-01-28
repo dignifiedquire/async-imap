@@ -1434,7 +1434,7 @@ impl<T: Read + Write + Unpin + fmt::Debug> Connection<T> {
             }
 
             if let Some(unsolicited) = unsolicited.clone() {
-                handle_unilateral(response, unsolicited).await;
+                handle_unilateral(response, unsolicited);
             }
 
             if let Some(res) = self.stream.next().await {
